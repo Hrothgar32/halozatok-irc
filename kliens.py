@@ -1,7 +1,23 @@
 #!/usr/bin/env python3
-from tkinter import *
+import threading
+from tkinter import Tk, Text, Label, Entry, messagebox
+from socket import socket, AF_INET, SOCK_STREAM
 
 username = None
+client_socket = socket(AF_INET, SOCK_STREAM)
+client_socket.connect(("localhost", 8080))
+
+
+def reader():
+    while 1:
+        message_str = client_socket.recv(2048).decode()
+        message = message_str.split("#")
+        if message[0] == "201":
+            text = "{}:{}\n".format(message[1], message[2])
+            message_area["state"] = "normal"
+            message_area.insert("end", text)
+            message_area.see("end")
+            message_area["state"] = "disabled"
 
 
 def callback(event):
@@ -9,17 +25,19 @@ def callback(event):
     text = input_entry.get()
     input_entry.delete(0, "end")
     if username:
-        text = "{}:{}\n".format(username, text)
+        display_text = "{}:{}\n".format(username, text)
         message_area["state"] = "normal"
-        message_area.insert("end", text)
+        message_area.insert("end", display_text)
         message_area.see("end")
         message_area["state"] = "disabled"
+        client_socket.sendall("{}#GLOBAL#{}".format(username, text).encode())
     else:
         stuff = text.split(" ")
         if stuff[0] != "/login":
-            print("Login first!")
+            messagebox.showwarning("Log in", "Log in first!")
         else:
             username = stuff[1]
+            client_socket.sendall("{}#LOGIN".format(username).encode())
 
 
 m = Tk()
@@ -33,5 +51,7 @@ Label(m, text="Input").grid(row=1)
 input_entry = Entry(m)
 input_entry.grid(row=1, column=1)
 input_entry.bind("<Return>", callback)
+
+threading.Thread(target=reader).start()
 
 m.mainloop()
